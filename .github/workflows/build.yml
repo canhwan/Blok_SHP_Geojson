@@ -1,0 +1,104 @@
+name: Build desktop apps
+
+on:
+  workflow_dispatch:  
+  push:
+    paths:
+      - '**.py'
+      - .github/workflows/build.yml
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            py: '3.12'
+          - os: macos-latest
+            py: '3.12'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python ${{ matrix.py }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.py }}
+
+      - name: Install dependencies (with GeoPandas stack)
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          pip install geopandas fiona shapely pyproj
+
+      # =====================
+      #    WINDOWS BUILD
+      # =====================
+      - name: Detect PROJ & GDAL (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $proj = python -c "import pyproj; print(pyproj.datadir.get_data_dir())"
+          $site = python - << 'EOF'
+import site, pathlib
+for p in site.getsitepackages():
+    d = pathlib.Path(p) / "osgeo/data"
+    if d.exists():
+        print(d)
+        break
+EOF
+          echo "PROJ=$proj" >> $env:GITHUB_ENV
+          echo "GDAL=$site" >> $env:GITHUB_ENV
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          pyinstaller --onedir --noconsole `
+            --name AppWindows `
+            --add-data "$env:PROJ;proj" `
+            --add-data "$env:GDAL;gdal" `
+            konversi_shp_ke_geojson.py
+
+      # =====================
+      #     MACOS BUILD
+      # =====================
+      - name: Detect PROJ & GDAL (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          export PROJ=$(python -c "import pyproj; print(pyproj.datadir.get_data_dir())")
+          export GDAL=$(python - << 'EOF'
+import site, pathlib
+for p in site.getsitepackages():
+    d = pathlib.Path(p) / "osgeo/data"
+    if d.exists():
+        print(d)
+        break
+EOF
+          )
+          echo "PROJ=$PROJ" >> $GITHUB_ENV
+          echo "GDAL=$GDAL" >> $GITHUB_ENV
+
+      - name: Build (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          pyinstaller --onedir --windowed \
+            --name AppMacOS \
+            --add-data "$PROJ:proj" \
+            --add-data "$GDAL:gdal" \
+            konversi_shp_ke_geojson.py
+
+      # =====================
+      #     UPLOAD ARTIFACTS
+      # =====================
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ runner.os }}-build
+          path: dist/**
