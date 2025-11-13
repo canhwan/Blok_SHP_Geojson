@@ -34,9 +34,7 @@ jobs:
           pip install --upgrade pip
           pip install pyinstaller geopandas fiona shapely pyproj
 
-      # ============================
       # WINDOWS
-      # ============================
       - name: Detect PROJ (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -44,18 +42,16 @@ jobs:
           $proj = python -c "import pyproj; print(pyproj.datadir.get_data_dir())"
           echo "PROJ=$proj" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-      - name: Build EXE (Windows)
+      - name: Build ONEFILE EXE (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          pyinstaller --onedir --noconsole `
+          pyinstaller --onefile --noconsole `
             --name KonversiSHPWindows `
             --add-data "$env:PROJ;proj" `
             konversi_shp_ke_geojson.py
 
-      # ============================
       # MACOS
-      # ============================
       - name: Detect PROJ (macOS)
         if: runner.os == 'macOS'
         shell: bash
@@ -63,18 +59,15 @@ jobs:
           PROJ=$(python -c "import pyproj; print(pyproj.datadir.get_data_dir())")
           echo "PROJ=$PROJ" >> $GITHUB_ENV
 
-      - name: Build APP (macOS)
+      - name: Build ONEFILE APP (macOS)
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          pyinstaller --onedir --windowed \
+          pyinstaller --onefile --windowed \
             --name KonversiSHPMac \
             --add-data "$PROJ:proj" \
             konversi_shp_ke_geojson.py
 
-      # ============================
-      # ARTIFACTS
-      # ============================
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
