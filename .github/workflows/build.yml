@@ -37,14 +37,12 @@ jobs:
       # ============================
       # WINDOWS
       # ============================
-      - name: Detect PROJ & GDAL (Windows)
+      - name: Detect PROJ (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $proj = python -c "import pyproj; print(pyproj.datadir.get_data_dir())"
-          $gdal = python -c "import site, pathlib; import sys; paths=site.getsitepackages(); print(next((str(pathlib.Path(p)/'osgeo'/'data') for p in paths if (pathlib.Path(p)/'osgeo'/'data').exists()), ''))"
-          echo \"PROJ=$proj\" | Out-File -FilePath $env:GITHUB_ENV -Append
-          echo \"GDAL=$gdal\" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "PROJ=$proj" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Build EXE (Windows)
         if: runner.os == 'Windows'
@@ -53,20 +51,17 @@ jobs:
           pyinstaller --onedir --noconsole `
             --name KonversiSHPWindows `
             --add-data "$env:PROJ;proj" `
-            --add-data "$env:GDAL;gdal" `
             konversi_shp_ke_geojson.py
 
       # ============================
       # MACOS
       # ============================
-      - name: Detect PROJ & GDAL (macOS)
+      - name: Detect PROJ (macOS)
         if: runner.os == 'macOS'
         shell: bash
         run: |
           PROJ=$(python -c "import pyproj; print(pyproj.datadir.get_data_dir())")
-          GDAL=$(python -c "import site, pathlib; paths=site.getsitepackages(); print(next((str(pathlib.Path(p)/'osgeo'/'data') for p in paths if (pathlib.Path(p)/'osgeo'/'data').exists()), ''))")
           echo "PROJ=$PROJ" >> $GITHUB_ENV
-          echo "GDAL=$GDAL" >> $GITHUB_ENV
 
       - name: Build APP (macOS)
         if: runner.os == 'macOS'
@@ -75,7 +70,6 @@ jobs:
           pyinstaller --onedir --windowed \
             --name KonversiSHPMac \
             --add-data "$PROJ:proj" \
-            --add-data "$GDAL:gdal" \
             konversi_shp_ke_geojson.py
 
       # ============================
