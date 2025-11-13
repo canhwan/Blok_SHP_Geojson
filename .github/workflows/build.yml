@@ -21,7 +21,7 @@ jobs:
             py: "3.12"
 
     steps:
-      - name: Checkout
+      - name: Checkout repo
         uses: actions/checkout@v4
 
       - name: Setup Python
@@ -34,22 +34,25 @@ jobs:
           pip install --upgrade pip
           pip install pyinstaller geopandas fiona shapely pyproj
 
-      # ======================================================
-      # =============== WINDOWS SECTION ======================
-      # ======================================================
+      # =============================
+      # Windows - Detect PROJ & GDAL
+      # =============================
       - name: Detect PROJ & GDAL (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $proj = python -c "import pyproj; print(pyproj.datadir.get_data_dir())"
-          $gdal = python -c "import site, pathlib; import sys; \
-p=site.getsitepackages(); \
-print([str((pathlib.Path(x)/'osgeo'/'data')) for x in p if (pathlib.Path(x)/'osgeo'/'data').exists()][0] if True else '')"
+          $gdal = python -c "import site, pathlib; import sys; import os; import json; \
+paths = site.getsitepackages(); \
+out = ''; \
+for p in paths: \
+  d = pathlib.Path(p) / 'osgeo' / 'data'; \
+  if d.exists(): out = str(d); break; \
+print(out)"
+          echo "PROJ=$proj" | Out-File -Append -FilePath $env:GITHUB_ENV
+          echo "GDAL=$gdal" | Out-File -Append -FilePath $env:GITHUB_ENV
 
-          echo "PROJ=$proj" | Out-File -FilePath $env:GITHUB_ENV -Append
-          echo "GDAL=$gdal" | Out-File -FilePath $env:GITHUB_ENV -Append
-
-      - name: Build EXE (Windows)
+      - name: Build Windows EXE
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
@@ -59,23 +62,25 @@ print([str((pathlib.Path(x)/'osgeo'/'data')) for x in p if (pathlib.Path(x)/'osg
             --add-data "$env:GDAL;gdal" `
             konversi_shp_ke_geojson.py
 
-      # ======================================================
-      # ================== MACOS SECTION =====================
-      # ======================================================
+      # =============================
+      # macOS - Detect PROJ & GDAL
+      # =============================
       - name: Detect PROJ & GDAL (macOS)
         if: runner.os == 'macOS'
         shell: bash
         run: |
           PROJ=$(python -c "import pyproj; print(pyproj.datadir.get_data_dir())")
-          GDAL=$(python -c "import site, pathlib; \
-import sys; \
-paths=site.getsitepackages(); \
-print([str((pathlib.Path(x)/'osgeo'/'data')) for x in paths if (pathlib.Path(x)/'osgeo'/'data').exists()][0] if True else '')")
-
+          GDAL=$(python -c "import site, pathlib; import sys; import os; \
+paths = site.getsitepackages(); \
+out = ''; \
+for p in paths: \
+  d = pathlib.Path(p) / 'osgeo' / 'data'; \
+  if d.exists(): out = str(d); break; \
+print(out)")
           echo "PROJ=$PROJ" >> $GITHUB_ENV
           echo "GDAL=$GDAL" >> $GITHUB_ENV
 
-      - name: Build APP (macOS)
+      - name: Build macOS APP
         if: runner.os == 'macOS'
         shell: bash
         run: |
@@ -85,9 +90,9 @@ print([str((pathlib.Path(x)/'osgeo'/'data')) for x in paths if (pathlib.Path(x)/
             --add-data "$GDAL:gdal" \
             konversi_shp_ke_geojson.py
 
-      # ======================================================
-      # ================= UPLOAD ARTIFACTS ===================
-      # ======================================================
+      # =============================
+      # UPLOAD ARTIFACTS
+      # =============================
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
