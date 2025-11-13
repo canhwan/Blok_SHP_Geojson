@@ -120,32 +120,101 @@ def mulai_proses(entry_field, progress_bar, status_label):
 def main_gui():
     app = tk.Tk()
     app.title("Konversi SHP ➜ GEOJSON (WGS84)")
-    app.geometry("520x250")
-    app.resizable(False, False)
 
+    # Ukuran aman untuk Windows DPI tinggi
+    app.geometry("700x420")
+    app.minsize(650, 380)
+
+    # Layout padding
+    PADX = 12
+    PADY = 8
+
+    # ==========================
     # JUDUL
-    tk.Label(app, text="KONVERSI SHP ➜ GEOJSON", font=("Arial", 14, "bold")).pack(pady=10)
+    # ==========================
+    title_frame = tk.Frame(app)
+    title_frame.pack(fill="x", pady=10)
 
+    tk.Label(
+        title_frame,
+        text="KONVERSI SHP ➜ GEOJSON (WGS84)",
+        font=("Arial", 16, "bold")
+    ).pack()
+
+    # ==========================
     # FRAME INPUT
+    # ==========================
     frame = tk.Frame(app)
-    frame.pack(pady=10)
+    frame.pack(fill="x", padx=PADX, pady=PADY)
 
-    tk.Label(frame, text="Pilih Folder SHP BLOK:", font=("Arial", 10)).grid(row=0, column=0, padx=5, pady=5)
-    folder_entry = tk.Entry(frame, width=45)
-    folder_entry.grid(row=0, column=1, padx=5, pady=5)
-    tk.Button(frame, text="Pilih", command=lambda: pilih_folder(folder_entry)).grid(row=0, column=2, padx=5, pady=5)
+    tk.Label(
+        frame,
+        text="Pilih Folder SHP BLOK:",
+        font=("Arial", 11)
+    ).grid(row=0, column=0, sticky="w", padx=5, pady=5)
 
+    folder_entry = tk.Entry(frame, width=50)
+    folder_entry.grid(row=0, column=1, sticky="we", padx=5, pady=5)
+
+    pilih_btn = tk.Button(
+        frame,
+        text="Browse",
+        width=10,
+        command=lambda: pilih_folder(folder_entry)
+    )
+    pilih_btn.grid(row=0, column=2, padx=5, pady=5)
+
+    frame.grid_columnconfigure(1, weight=1)
+
+    # ==========================
+    # TOMBOL MULAI
+    # ==========================
+    start_btn = tk.Button(
+        app,
+        text="Mulai Konversi",
+        bg="#2e7d32",
+        fg="white",
+        font=("Arial", 11, "bold"),
+        width=20,
+        command=lambda: mulai_proses(folder_entry, progress, status_label)
+    )
+    start_btn.pack(pady=15)
+
+    # ==========================
     # PROGRESS BAR
-    progress = ttk.Progressbar(app, orient="horizontal", length=400, mode="determinate")
-    progress.pack(pady=15)
+    # ==========================
+    progress = ttk.Progressbar(
+        app,
+        orient="horizontal",
+        length=500,
+        mode="determinate"
+    )
+    progress.pack(pady=10)
 
-    # STATUS LABEL
-    status_label = tk.Label(app, text="", font=("Arial", 9), fg="gray")
+    # ==========================
+    # STATUS
+    # ==========================
+    status_label = tk.Label(
+        app,
+        text="",
+        font=("Arial", 10),
+        fg="gray"
+    )
     status_label.pack()
 
-    # TOMBOL MULAI
-    tk.Button(app, text="Mulai Konversi", bg="#2e7d32", fg="white", width=20,
-              command=lambda: mulai_proses(folder_entry, progress, status_label)).pack(pady=15)
+    # ==========================
+    # COPYRIGHT
+    # ==========================
+    footer = tk.Label(
+        app,
+        text="© 2025 Bapenda Kabupaten Malang",
+        font=("Arial", 9),
+        fg="gray"
+    )
+    footer.pack(side="bottom", pady=10)
+
+    # Optimalkan layout
+    app.update_idletasks()
 
     app.mainloop()
 
