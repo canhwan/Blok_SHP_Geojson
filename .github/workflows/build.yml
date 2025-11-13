@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - '**.py'
-      - .github/workflows/build.yml
+      - "**.py"
+      - ".github/workflows/build.yml"
 
 jobs:
   build:
@@ -16,101 +16,80 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            py: '3.12'
+            py: "3.12"
           - os: macos-latest
-            py: '3.12'
+            py: "3.12"
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Python ${{ matrix.py }}
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.py }}
 
-      - name: Install dependencies (with GeoPandas stack)
+      - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install pyinstaller
-          pip install geopandas fiona shapely pyproj
+          pip install --upgrade pip
+          pip install pyinstaller geopandas fiona shapely pyproj
 
-      # =====================
-      #    WINDOWS: detect PROJ & GDAL
-      # =====================
+      # ======================================================
+      # =============== WINDOWS SECTION ======================
+      # ======================================================
       - name: Detect PROJ & GDAL (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $proj = python -c "import pyproj; print(pyproj.datadir.get_data_dir())"
-          $gdal = python -c "import site, pathlib, sys
-for p in site.getsitepackages():
-    d = pathlib.Path(p) / 'osgeo' / 'data'
-    if d.exists():
-        print(d)
-        sys.exit(0)
-print('')"
-          if (-not $proj) { Write-Error 'PROJ data path not found'; exit 1 }
-          # $gdal might be empty if not present; we still export it (blank ok)
-          echo "PROJ=$proj" >> $env:GITHUB_ENV
-          echo "GDAL=$gdal" >> $env:GITHUB_ENV
+          $gdal = python -c "import site, pathlib; import sys; \
+p=site.getsitepackages(); \
+print([str((pathlib.Path(x)/'osgeo'/'data')) for x in p if (pathlib.Path(x)/'osgeo'/'data').exists()][0] if True else '')"
 
-      - name: Build (Windows)
+          echo "PROJ=$proj" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "GDAL=$gdal" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Build EXE (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          # Use onedir (folder) build to avoid onefile complexity with many binary deps
           pyinstaller --onedir --noconsole `
-            --name AppWindows `
+            --name KonversiSHPWindows `
             --add-data "$env:PROJ;proj" `
             --add-data "$env:GDAL;gdal" `
             konversi_shp_ke_geojson.py
 
-      # =====================
-      #    macOS: detect PROJ & GDAL
-      # =====================
+      # ======================================================
+      # ================== MACOS SECTION =====================
+      # ======================================================
       - name: Detect PROJ & GDAL (macOS)
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          PROJ=$(python - <<'PY'
-import pyproj, sys
-print(pyproj.datadir.get_data_dir() or "")
-PY
-)
-          GDAL=$(python - <<'PY'
-import site, pathlib, sys
-out = ""
-for p in site.getsitepackages():
-    d = pathlib.Path(p) / "osgeo" / "data"
-    if d.exists():
-        out = str(d)
-        break
-print(out)
-PY
-)
-          if [ -z "$PROJ" ]; then
-            echo "PROJ data path not found"
-            exit 1
-          fi
+          PROJ=$(python -c "import pyproj; print(pyproj.datadir.get_data_dir())")
+          GDAL=$(python -c "import site, pathlib; \
+import sys; \
+paths=site.getsitepackages(); \
+print([str((pathlib.Path(x)/'osgeo'/'data')) for x in paths if (pathlib.Path(x)/'osgeo'/'data').exists()][0] if True else '')")
+
           echo "PROJ=$PROJ" >> $GITHUB_ENV
           echo "GDAL=$GDAL" >> $GITHUB_ENV
 
-      - name: Build (macOS)
+      - name: Build APP (macOS)
         if: runner.os == 'macOS'
         shell: bash
         run: |
           pyinstaller --onedir --windowed \
-            --name AppMacOS \
+            --name KonversiSHPMac \
             --add-data "$PROJ:proj" \
             --add-data "$GDAL:gdal" \
             konversi_shp_ke_geojson.py
 
-      # =====================
-      #     UPLOAD ARTIFACTS
-      # =====================
-      - name: Upload build artifacts
+      # ======================================================
+      # ================= UPLOAD ARTIFACTS ===================
+      # ======================================================
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ runner.os }}-build
+          name: Build-${{ runner.os }}
           path: dist/**
