@@ -1,7 +1,7 @@
 name: Build desktop apps
 
 on:
-  workflow_dispatch:  
+  workflow_dispatch:
   push:
     paths:
       - '**.py'
@@ -36,28 +36,30 @@ jobs:
           pip install geopandas fiona shapely pyproj
 
       # =====================
-      #    WINDOWS BUILD
+      #    WINDOWS: detect PROJ & GDAL
       # =====================
       - name: Detect PROJ & GDAL (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $proj = python -c "import pyproj; print(pyproj.datadir.get_data_dir())"
-          $site = python - << 'EOF'
-import site, pathlib
+          $gdal = python -c "import site, pathlib, sys
 for p in site.getsitepackages():
-    d = pathlib.Path(p) / "osgeo/data"
+    d = pathlib.Path(p) / 'osgeo' / 'data'
     if d.exists():
         print(d)
-        break
-EOF
+        sys.exit(0)
+print('')"
+          if (-not $proj) { Write-Error 'PROJ data path not found'; exit 1 }
+          # $gdal might be empty if not present; we still export it (blank ok)
           echo "PROJ=$proj" >> $env:GITHUB_ENV
-          echo "GDAL=$site" >> $env:GITHUB_ENV
+          echo "GDAL=$gdal" >> $env:GITHUB_ENV
 
       - name: Build (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          # Use onedir (folder) build to avoid onefile complexity with many binary deps
           pyinstaller --onedir --noconsole `
             --name AppWindows `
             --add-data "$env:PROJ;proj" `
@@ -65,22 +67,32 @@ EOF
             konversi_shp_ke_geojson.py
 
       # =====================
-      #     MACOS BUILD
+      #    macOS: detect PROJ & GDAL
       # =====================
       - name: Detect PROJ & GDAL (macOS)
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          export PROJ=$(python -c "import pyproj; print(pyproj.datadir.get_data_dir())")
-          export GDAL=$(python - << 'EOF'
-import site, pathlib
+          PROJ=$(python - <<'PY'
+import pyproj, sys
+print(pyproj.datadir.get_data_dir() or "")
+PY
+)
+          GDAL=$(python - <<'PY'
+import site, pathlib, sys
+out = ""
 for p in site.getsitepackages():
-    d = pathlib.Path(p) / "osgeo/data"
+    d = pathlib.Path(p) / "osgeo" / "data"
     if d.exists():
-        print(d)
+        out = str(d)
         break
-EOF
-          )
+print(out)
+PY
+)
+          if [ -z "$PROJ" ]; then
+            echo "PROJ data path not found"
+            exit 1
+          fi
           echo "PROJ=$PROJ" >> $GITHUB_ENV
           echo "GDAL=$GDAL" >> $GITHUB_ENV
 
